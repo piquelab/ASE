@@ -1,3 +1,12 @@
+##################################################################
+## Added model fitting for multiple samples with individual epsilon 
+##
+## Created: 08/09/2013
+##
+## Author: RPR, CH
+##
+## Version0.0: to be run interactively
+##################################################################
 ## 
 ## Updated from /nfs/hpnfs/groups/piquelab/gmb/AI/results/fitAseModels.R
 ##
