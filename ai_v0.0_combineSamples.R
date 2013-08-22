@@ -8,41 +8,47 @@
 ##
 ## Version0.0: to be run interactively
 ##################################################################
-setwd("/wsu/home/fl/fl97/fl9788/piquelab/charvey/ASE/cleanBedfiles")
+##setwd("/wsu/home/fl/fl97/fl9788/piquelab/charvey/ASE/cleanBedfiles")
 ##################################################################  
-fileList <- dir("./"," *pileup.clean.bed.gz$")
-#fileList <- dir("./",".*Dex.*pileup.clean.bed.gz$")
-## grep -v grep non matching lines -w matching whole word 
-##system("less *Dex*.pileup.clean.bed.gz | grep -v -w '^chr' | cut -f 1-3 | bedSort stdin stdout | uniq | gzip > union.bed.gz")
-system("less *.pileup.clean.bed.gz | grep -v -w '^chr' | cut -f 1-3,7 | bedSort stdin stdout | uniq | gzip > HUVEC_union.bed.gz")
-
-sNames = gsub(".pileup.clean.bed.gz","",fileList)
-sNames
-##################################################################  
-##################################################################  
-ExtractFields <- function(fn){			
-	#fn <- fileList[1]
-	cat("Processing:",fn,"\n")
-	command=paste("intersectBed -a HUVEC_union.bed.gz -b ",fn," -wao | cut -f 12-14 ",sep="")
-	aa <- read.table(pipe(command),sep="\t",as.is=T,na.strings=".")
-	aa[is.na(aa)] <- 0
-	aa			
+UnionExtractFields <- function(fileList, combine=FALSE){			
+	#browser()
+	tmpFile <- scan(pipe("mktemp -t"),character(0))
+	system(paste("less *.pileup.clean.bed.gz | grep -v -w '^chr' | cut -f 1-3,7 | bedSort stdin stdout | uniq | gzip > ",tmpFile))
+	sNames = gsub(".pileup.clean.bed.gz","",fileList)
+		
+	anno <- read.table(gzfile(tmpFile),sep="\t",as.is=T)	
+	
+	aux <- sapply(fileList,function(fn){			
+				#fn <- fileList[1]
+				cat("Processing:",fn,"\n")
+				command=paste("intersectBed -a ",tmpFile," -b ",fn," -wao | cut -f 1-3,12-14 ",sep="")
+				aa <- read.table(pipe(command),sep="\t",as.is=T,na.strings=".")
+				aa[is.na(aa)] <- 0
+				stopifnot(identical(aa[,1:3],anno[,1:3]))
+				aa[,-(1:3)]
+			})
+	colnames(anno) = c("chr","pos0","pos","af")
+	
+	Ref <- as.matrix(do.call(cbind,aux[1,]))
+	colnames(Ref) <- sNames
+	Alt <- as.matrix(do.call(cbind,aux[2,]))
+	colnames(Alt) <- sNames
+	Err <- as.matrix(do.call(cbind,aux[3,]))
+	colnames(Err) <- sNames
+		
+	return.list<-list(ref=Ref,alt=Alt,err=Alt,anno=anno);
+	
+	if(combine==TRUE){
+		allRef<-apply(Ref, MARGIN=1, sum)
+		allAlt<-apply(Alt, MARGIN=1, sum)
+		allErr<-apply(Err, MARGIN=1, sum)
+		
+		return.list$all<-as.matrix(cbind(allRef, allAlt, allErr))
+		
+	}
+	setwd(current.directory)
+	return(return.list)
 }
-
-aux <- sapply(fileList,ExtractFields)
-
-Ref <- as.matrix(do.call(cbind,aux[1,]))
-colnames(Ref) <- sNames
-Alt <- as.matrix(do.call(cbind,aux[2,]))
-colnames(Alt) <- sNames
-Err <- as.matrix(do.call(cbind,aux[3,]))
-colnames(Err) <- sNames
-
-allRef<-apply(Ref, MARGIN=1, sum)
-allAlt<-apply(Alt, MARGIN=1, sum)
-allErr<-apply(Err, MARGIN=1, sum)
-
-outData<-as.matrix(cbind(allRef, allAlt, allErr))
-outFile<-"HUVEC_0_combined.gz"
-
-write.table(outData,file=gzfile(paste(outFile,sep='')),row.names=F,col.names=F,sep='\t',quote=F)
+##################################################################  
+#ase.dat<-UnionExtractFields(pileups,combine=TRUE)
+##################################################################  

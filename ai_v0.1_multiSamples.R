@@ -5,17 +5,112 @@
 ##
 ## Author: CTH
 ##
-## Version0.0: to be run interactively
+## Version0.1: check multiple samples to determine if they came from the same individual
 ##################################################################
-## Allele specific funtions. 
+## Data aggregation functions
+source('/nfs/hpnfs/groups/piquelab/charvey/ASE/src/ai_v0.1_combineSamples.R')
+## ASE model fitting functions funtions 
 source('/nfs/hpnfs/groups/piquelab/charvey/ASE/src/ai_v0.0_fitAseModels.R')
 ## Some ploting functions
 source('/nfs/hpnfs/groups/piquelab/gmb/AI/results/qqman.r')
+#setwd("/wsu/home/fl/fl97/fl9788/piquelab/charvey/ASE/cleanBedfiles")
+#pileups <- dir("./"," *pileup.clean.bed.gz$")
 ##################################################################
-setwd("/wsu/home/fl/fl97/fl9788/piquelab/charvey/ASE/cleanBedfiles")
+setwd("/nfs/rprscratch/pipeline3/res")
 ##################################################################
-pileupFile='HUVEC_0_combined.gz'
-unionFile='HUVEC_union.bed.gz'
+pileups <- as.character(scan("selectByDmax.txt", what = character(), strip.white=TRUE))
+pileups<-paste("/nfs/rprscratch/pipeline3/res/",pileups,"/",pileups,".pileup.clean.bed.gz",sep="")
+ase.dat<-UnionExtractFields(pileups)
+##################################################################  
+ref<-ase.dat[[1]]
+alt<-ase.dat[[2]]
+err<-ase.dat[[3]]
+##################################################################  
+n.samples<-dim(ref)[2]
+
+tr<-15
+indMat <- (ref+alt)>tr
+selRows<- rowSums(indMat)>=2;
+ref <- ref[selRows,]
+alt <- alt[selRows,]
+err <- err[selRows,]
+indMat <- indMat[selRows,]
+
+rhoall <- ref/(alt+ref)
+simmat <- cor(rhoall)
+
+
+aux <- t(sapply(1:(n.samples-1),function(ii){
+	cat("Processing ii:",ii,"\n")
+	aux <- rep(0,n.samples)
+	aux[(ii+1):n.samples] <- sapply((ii+1):n.samples,function(jj){
+ 			
+				
+		indVec <- indMat[,ii] & indMat[,jj]
+		##sum(indVec)
+
+		#row.1<-ref[indVec,ii]*(ref[indVec,ii]+alt[indVec,ii])^-1
+		#row.2<-ref[indVec,jj]*(ref[indVec,jj]+alt[indVec,jj])^-1
+		
+		#cor(row.1,row.2)
+		all.ref <- cbind(ref[indVec,ii],ref[indVec,jj])
+		all.alt <- cbind(alt[indVec,ii],alt[indVec,jj])
+		
+		cat("Processing ii:",length(all.ref),"\n")
+		
+		llkMulti <- fitAseNullMulti(all.ref,all.alt)$loglik
+		llk.1 <- fitAseNull(ref[indVec,ii],alt[indVec,ii])$loglik
+		llk.2 <- fitAseNull(ref[indVec,jj],alt[indVec,jj])$loglik		
+		
+		bf <- exp(llkMulti-llk.1-llk.2)
+		#bf <- exp(llk.1+llk.2-llkMulti)
+		
+	})
+	aux
+}))
+
+save()
+##################################################################  
+
+aux <- rbind(aux,rep(0,n.samples))
+dim(aux)
+aux <- aux + t(aux)
+
+png(file='~/bayesFactor.test.png',width=2000,height=2000)
+
+colnames(aux) <- colnames(ref)
+rownames(aux) <- colnames(ref)
+image(aux)
+
+dev.off()
+##################################################################  
+
+diag(aux)<-0
+
+vmax <- apply(aux,1,max)
+
+hist(vmax,breaks=20);
+
+aux2 <- aux[vmax>12000,vmax>12000];
+dmat <- exp(-aux2)
+dmat[dmat>60000] <- 60000
+
+diag(dmat) <- 0
+png(file='~/bayesFactor.test.png',width=2000,height=2000)
+
+
+heatmap(dmat,margins=c(40,40),cexCol=1.5,cexRow=1.5)
+dev.off()
+##diag(aux2) <-1
+##heatmap(1-aux2)
+
+##aux <- do.call(rbind,aux)
+aux[1:10,1:10]
+str(aux)
+
+##################################################################  
+#pileupFile='HUVEC_0_combined.gz'
+#unionFile='HUVEC_union.bed.gz'
 
 command=paste("gunzip -cd ",pileupFile)
 unionCommand=paste("gunzip -cd ",unionFile)

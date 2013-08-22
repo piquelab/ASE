@@ -188,7 +188,7 @@ fitAse <- function(ref,alt,eps=0.1,rho,t1=1E-100,log.gmat,max.it=100,tol=1E-16,f
 }
 
 
-fitAseNull <- function(ref,alt,eps=0.1,log.gmat,max.it=100,tol=1E-16,fixGprior=TRUE){
+fitAseNull <- function(ref,alt,eps=0.1,log.gmat,max.it=100,tol=1E-16,fixGprior=TRUE,verbose=TRUE){
   L <- length(ref);
   stopifnot(L == length(alt));
   ## Parameter initialization
@@ -236,14 +236,16 @@ fitAseNull <- function(ref,alt,eps=0.1,log.gmat,max.it=100,tol=1E-16,fixGprior=T
     }
     ## ##
     it.num <- it.num +1;
-    cat("#it:",it.num,"eps=",eps,"Post:",colMeans(gt),"loglik",logliksum,"DeltaLogLik",abs(new.logliksum-logliksum),"\n");
-    stopifnot(!is.na(eps))
+	if(verbose){
+    	cat("#it:",it.num,"eps=",eps,"Post:",colMeans(gt),"loglik",logliksum,"DeltaLogLik",abs(new.logliksum-logliksum),"\n");
+    }
+	stopifnot(!is.na(eps))
     logliksum <- new.logliksum;
   }
   invisible(list(gt=gt,log.gt=log.gt,eps=eps,loglik=loglik,logliksum=logliksum))
 }
 
-fitAseNullMulti <- function(ref,alt,eps=rep(0.1,ncol(ref)),log.gmat,max.it=100,tol=1E-16,fixGprior=TRUE){
+fitAseNullMulti <- function(ref,alt,eps=rep(0.1,ncol(ref)),log.gmat,max.it=100,tol=1E-16,fixGprior=TRUE,verbose=TRUE){
 	L <- nrow(ref);
 	S <- ncol(ref);
 	##browser()
@@ -270,6 +272,11 @@ fitAseNullMulti <- function(ref,alt,eps=rep(0.1,ncol(ref)),log.gmat,max.it=100,t
 		##browser()
 		## This normalizes marginal posterior probabilities to add 1
 		loglik <- log(exp(log.gt) %*% rep(1,3));
+		#norm.genotypes<-t(sapply(1:L,function(ii){
+		#	exp(log.gt[ii,])*(exp(loglik[ii])^-1)
+		#
+		#	}))
+		#cat(norm.genotypes[1,],'\n')
 		new.logliksum <- sum(loglik);
 		if(abs(new.logliksum-logliksum)<tol)
 			converged <- TRUE;
@@ -298,7 +305,9 @@ fitAseNullMulti <- function(ref,alt,eps=rep(0.1,ncol(ref)),log.gmat,max.it=100,t
 		}
 		## ##
 		it.num <- it.num +1;
-		cat("#it:",it.num,"eps=",eps,"Post:",colMeans(gt),"loglik",logliksum,"DeltaLogLik",abs(new.logliksum-logliksum),"\n");
+		if(verbose){
+			cat("#it:",it.num,"eps=",eps,"Post:",colMeans(gt),"loglik",logliksum,"DeltaLogLik",abs(new.logliksum-logliksum),"\n");
+		}
 		stopifnot(!is.na(eps))
 		logliksum <- new.logliksum;
 	}
